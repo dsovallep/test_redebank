@@ -1,79 +1,76 @@
 # Servicio de Parámetros
 
-Este es un microservicio desarrollado en Django y Django REST Framework para gestionar parámetros de configuración con valores flexibles.
+Microservicio en Django + DRF para gestionar parámetros con valores flexibles (null, number, boolean, string, array, object).
 
 ## Tecnologías
-
-- Python 3.x
-- Django
+- Python 3.9
+- Django 4.2
 - Django REST Framework
 - PostgreSQL
+- Docker (y despliegue en Kubernetes)
 
-## Instalación y Ejecución Local
+## Arquitectura y patrón de diseño
+- Arquitectura: microservicio REST, containerizado.
+- Patrón: MVC de Django con DRF (Model + Serializer + ViewSet + Router). Se expone una API RESTful con `ModelViewSet` y enrutamiento automático.
 
-Sigue estos pasos para levantar el proyecto en tu entorno local.
+## Configuración de entornos
+El proyecto selecciona el archivo de entorno por `DJANGO_ENV`:
+- dev → .env
+- test → .env.test
+- prod → .env.prod
 
-**1. Prerrequisitos**
+Variables requeridas: DJANGO_SECRET_KEY, DJANGO_DEBUG, DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT.
 
-- Tener Python 3 y `pip` instalados.
-- Tener PostgreSQL instalado y corriendo.
-
-**2. Clonar el Repositorio**
-
-```bash
-git clone <URL-de-tu-repo-en-github>
-cd <nombre-de-la-carpeta>
-```
-
-**3. Configurar Entorno Virtual e Instalar Dependencias**
-
+## Ejecución local
 ```bash
 python -m venv venv
-# Activar entorno:
-# Windows: venv\Scripts\activate
-# macOS/Linux: source venv/bin/activate
-
+source venv/bin/activate
 pip install -r requirements.txt
-```
-*(Nota: debes crear el archivo `requirements.txt` con `pip freeze > requirements.txt`)*
 
-**4. Configurar Base de Datos**
+# Elegir entorno
+export DJANGO_ENV=dev  # o test/prod
 
-- Crea una base de datos en PostgreSQL (ej. `parameter_db`).
-- Renombra el archivo `.env.example` a `.env` y edita las variables de conexión a la base de datos. 
-  *(Nota: Esto es una mejora. Modificarías `settings.py` para leer de un archivo `.env` usando una librería como `python-decouple`)*.
-- O, edita directamente `config/settings.py` con tus credenciales de la base de datos.
-
-**5. Aplicar Migraciones e Iniciar Servidor**
-
-```bash
 python manage.py migrate
 python manage.py runserver
 ```
+API base: http://127.0.0.1:8000/api/v1/  
+Docs: http://127.0.0.1:8000/swagger/
 
-El servicio estará disponible en `http://127.0.0.1:8000`.
-
-**6. Ejecutar Pruebas Unitarias**
-
+## Pruebas
 ```bash
+export DJANGO_ENV=test
 python manage.py test
 ```
 
-## Endpoints de la API
+## Docker
+```bash
+docker build -t parameter-service:local .
+docker run -p 8000:8000 \
+  -e DJANGO_ENV=prod \
+  -e DJANGO_SECRET_KEY=change-me \
+  -e DJANGO_DEBUG=False \
+  -e DB_NAME=parameter_db \
+  -e DB_USER=user \
+  -e DB_PASS=pass \
+  -e DB_HOST=host.docker.internal \
+  -e DB_PORT=5432 \
+  parameter-service:local
+```
 
-La base de la API es `/api/v1/`.
+## Kubernetes
+- Empaqueta y publica la imagen en tu registry.
+- Crea los `Secrets` con las variables.
+- Aplica manifiestos:
+```bash
+kubectl apply -f k8s/deployment.yaml
+```
 
-- `GET /api/v1/parameters/`: Lista todos los parámetros.
-- `POST /api/v1/parameters/`: Crea un nuevo parámetro.
-- `GET /api/v1/parameters/{name}/`: Obtiene un parámetro por su nombre.
-- `PUT /api/v1/parameters/{name}/`: Actualiza un parámetro por su nombre.
-- `DELETE /api/v1/parameters/{name}/`: Elimina un parámetro por su nombre.
+## Endpoints
+Base `/api/v1/`
+- GET/POST `/parameters/`
+- GET/PUT/DELETE `/parameters/{name}/`
 
-### Ejemplo de Body para POST/PUT
-
+Ejemplo body:
 ```json
-{
-    "name": "parameterName",
-    "values": ["any", "valid", "json", true, 123, {"nested": "object"}]
-}
+{ "name": "policyAlert", "values": true }
 ```
