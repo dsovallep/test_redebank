@@ -7,70 +7,88 @@ Microservicio en Django + DRF para gestionar parámetros con valores flexibles (
 - Django 4.2
 - Django REST Framework
 - PostgreSQL
-- Docker (y despliegue en Kubernetes)
+- Docker / docker-compose
 
 ## Arquitectura y patrón de diseño
-- Arquitectura: microservicio REST, containerizado.
-- Patrón: MVC de Django con DRF (Model + Serializer + ViewSet + Router). Se expone una API RESTful con `ModelViewSet` y enrutamiento automático.
+- Arquitectura: microservicio REST (Django + DRF) containerizado.
+- Patrón: MVC (Model + Serializer + ViewSet + Router). `ModelViewSet` expone CRUD REST.
 
-## Configuración de entornos
-El proyecto selecciona el archivo de entorno por `DJANGO_ENV`:
-- dev → .env
-- test → .env.test
-- prod → .env.prod
+## Entornos
+Selección por variable `DJANGO_ENV` (dev|test|prod). Archivos: `.env`, `.env.test`, `.env.prod` (se cargan según `DJANGO_ENV`). Se recomienda incluir un `.env.example` (no incluido aún) para documentar variables:
 
-Variables requeridas: DJANGO_SECRET_KEY, DJANGO_DEBUG, DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT.
+```
+DJANGO_SECRET_KEY=
+DJANGO_DEBUG=
+DB_NAME=
+DB_USER=
+DB_PASS=
+DB_HOST=
+DB_PORT=
+DJANGO_ALLOWED_HOSTS=
+```
 
-## Ejecución local
+## Inicio rápido con docker-compose
+Requiere Docker y docker-compose plugin.
+
+```bash
+docker compose up --build
+```
+
+El servicio:
+- Ejecuta migraciones automáticamente (ver [docker-compose.yml](docker-compose.yml)).
+- Expone API en http://localhost:8000/api/v1/
+- Base de datos PostgreSQL expuesta en puerto 5432 (solo local).
+
+Detener:
+```bash
+docker compose down
+```
+
+Logs:
+```bash
+docker compose logs -f web
+```
+
+### Ejecutar pruebas dentro del contenedor
+```bash
+docker compose run --rm web python manage.py test
+```
+
+### Cambiar entorno
+Editar la sección `environment` del servicio `web` en [docker-compose.yml](docker-compose.yml) (p.e. `DJANGO_ENV: prod` y ajustar variables).
+
+## Ejecución sin Docker (opcional)
 ```bash
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-# Elegir entorno
-export DJANGO_ENV=dev  # o test/prod
-
+export DJANGO_ENV=dev
 python manage.py migrate
 python manage.py runserver
-```
-API base: http://127.0.0.1:8000/api/v1/  
-Docs: http://127.0.0.1:8000/swagger/
-
-## Pruebas
-```bash
-export DJANGO_ENV=test
-python manage.py test
-```
-
-## Docker
-```bash
-docker build -t parameter-service:local .
-docker run -p 8000:8000 \
-  -e DJANGO_ENV=prod \
-  -e DJANGO_SECRET_KEY=change-me \
-  -e DJANGO_DEBUG=False \
-  -e DB_NAME=parameter_db \
-  -e DB_USER=user \
-  -e DB_PASS=pass \
-  -e DB_HOST=host.docker.internal \
-  -e DB_PORT=5432 \
-  parameter-service:local
-```
-
-## Kubernetes
-- Empaqueta y publica la imagen en tu registry.
-- Crea los `Secrets` con las variables.
-- Aplica manifiestos:
-```bash
-kubectl apply -f k8s/deployment.yaml
 ```
 
 ## Endpoints
 Base `/api/v1/`
-- GET/POST `/parameters/`
-- GET/PUT/DELETE `/parameters/{name}/`
+- GET /parameters/
+- POST /parameters/
+- GET /parameters/{name}/
+- PUT /parameters/{name}/
+- PATCH /parameters/{name}/
+- DELETE /parameters/{name}/
 
-Ejemplo body:
+Ejemplo creación:
 ```json
 { "name": "policyAlert", "values": true }
 ```
+
+## Tests
+Incluye prueba de creación ([parameters/tests.py](parameters/tests.py)).
+
+## Despliegue (resumen)
+1. Construir imagen: `docker build -t your-registry/parameter-service:TAG .`
+2. Publicar en registry.
+3. Kubernetes/ECS: definir secretos con las variables y aplicar manifiestos (ver futura carpeta `k8s/`).
+
+## Seguridad y validación
+- `values`: validado como tipos JSON (ver [parameters/serializers.py](parameters/serializers.py)).
+- Respuestas: DRF maneja códigos estándar (201, 200, 400, 404, 204).
