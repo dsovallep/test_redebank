@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: parameter_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  web:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DJANGO_ENV: dev
+      DJANGO_SECRET_KEY: change-me
+      DJANGO_DEBUG: "True"
+      DB_NAME: parameter_db
+      DB_USER: user
+      DB_PASS: pass
+      DB_HOST: db
+      DB_PORT: "5432"
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "python manage.py migrate &&
+             gunicorn parameter_service.wsgi:application --bind 0.0.0.0:8000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
